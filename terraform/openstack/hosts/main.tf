@@ -44,7 +44,7 @@ resource "openstack_compute_instance_v2" "control" {
   image_name = "${ var.image_name }"
   flavor_name = "${ var.control_flavor_name }"
   security_groups = [ "${ var.security_groups }" ]
-  scheduler_hints = { group = "${ openstack_compute_servergroup_v2.control-sg.id }"
+  scheduler_hints = { group = "${ openstack_compute_servergroup_v2.control-sg.id }" }
   network = { uuid  = "${ var.net_id }" }
   volume = {
     volume_id = "${element(openstack_blockstorage_volume_v1.mi-control-glusterfs.*.id, count.index)}"
