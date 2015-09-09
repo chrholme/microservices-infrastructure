@@ -26,14 +26,14 @@ provider "openstack" {
   tenant_name	= "${ var.tenant_name }"
 }
 
-resource "openstack_blockstorage_volume_v1" "k8s-glusterfs" {
-  name = "${ var.short_name }-master-glusterfs-${format("%02d", count.index+1) }"
-  description = "${ var.short_name }-master-glusterfs-${format("%02d", count.index+1) }"
+resource "openstack_blockstorage_volume_v1" "mi-control-glusterfs" {
+  name = "${ var.short_name }-control-glusterfs-${format("%02d", count.index+1) }"
+  description = "${ var.short_name }-control-glusterfs-${format("%02d", count.index+1) }"
   size = "${ var.glusterfs_volume_size }"
   metadata = {
     usage = "container-volumes"
   }
-  count = "${ var.master_count }"
+  count = "${ var.control_count }"
 }
 
 resource "openstack_compute_servergroup_v2" "control-sg" {
@@ -51,7 +51,7 @@ resource "openstack_compute_instance_v2" "control" {
   scheduler_hints = { group = "${ openstack_compute_servergroup_v2.control-sg.id }" }
   network               = { uuid = "${ openstack_networking_network_v2.ms-network.id }" }
   volume = {
-    volume_id = "${element(openstack_blockstorage_volume_v1.k8s-glusterfs.*.id, count.index)}"
+    volume_id = "${element(openstack_blockstorage_volume_v1.mi-control-glusterfs.*.id, count.index)}"
     device = "/dev/vdb"
   }
   metadata              = {
