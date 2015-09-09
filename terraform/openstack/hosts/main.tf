@@ -14,6 +14,8 @@ variable short_name { default = "mi" }
 variable ssh_user { default = "centos" }
 variable tenant_id { }
 variable tenant_name { }
+variable server_group_control_policy { default = "anti-affinity" }
+variable server_group_resource_policy { default = "anti-affinity" }
 
 provider "openstack" {
   auth_url = "${ var.auth_url }"
@@ -31,12 +33,18 @@ resource "openstack_blockstorage_volume_v1" "mi-control-glusterfs" {
   count = "${ var.control_count }"
 }
 
+resource "openstack_compute_servergroup_v2" "control-sg" {
+  name = "${ var.short_name }-control-server-group"
+  policies = ["${ var.server_group_control_policy }"]
+}
+
 resource "openstack_compute_instance_v2" "control" {
   name = "${ var.short_name}-control-${format("%02d", count.index+1) }"
   key_pair = "${ var.keypair_name }"
   image_name = "${ var.image_name }"
   flavor_name = "${ var.control_flavor_name }"
   security_groups = [ "${ var.security_groups }" ]
+  scheduler_hints = { group = "${ openstack_compute_servergroup_v2.control-sg.id }"
   network = { uuid  = "${ var.net_id }" }
   volume = {
     volume_id = "${element(openstack_blockstorage_volume_v1.mi-control-glusterfs.*.id, count.index)}"
@@ -50,12 +58,18 @@ resource "openstack_compute_instance_v2" "control" {
   count = "${ var.control_count }"
 }
 
+resource "openstack_compute_servergroup_v2" "resource-sg" {
+  name = "${ var.short_name}-resource-server-group"
+  policies = ["${var.server_group_resource_policy}"]
+}
+
 resource "openstack_compute_instance_v2" "resource" {
   name = "${ var.short_name}-worker-${format("%02d", count.index+1) }"
   key_pair = "${ var.keypair_name }"
   image_name = "${ var.image_name }"
   flavor_name = "${ var.resource_flavor_name }"
   security_groups = [ "${ var.security_groups }" ]
+  scheduler_hints = { group = "${ openstack_compute_servergroup_v2.resource-sg.id }" }
   network = { uuid = "${ var.net_id }" }
   metadata = {
     dc = "${var.datacenter}"

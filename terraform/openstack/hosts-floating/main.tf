@@ -17,6 +17,8 @@ variable ip_version { default = "4" }
 variable short_name { default = "mi" }
 variable long_name { default = "microservices-infrastructure" }
 variable ssh_user { default = "centos" }
+variable server_group_control_policy { default = "anti-affinity" }
+variable server_group_resource_policy { default = "anti-affinity" }
 
 provider "openstack" {
   auth_url	= "${ var.auth_url }"
@@ -34,6 +36,11 @@ resource "openstack_blockstorage_volume_v1" "k8s-glusterfs" {
   count = "${ var.master_count }"
 }
 
+resource "openstack_compute_servergroup_v2" "control-sg" {
+  name = "${ var.short_name }-control-server-group"
+  policies = ["${ var.server_group_control_policy }"]
+}
+
 resource "openstack_compute_instance_v2" "control" {
   floating_ip = "${ element(openstack_compute_floatingip_v2.ms-control-floatip.*.address, count.index) }"
   name                  = "${ var.short_name}-control-${format("%02d", count.index+1) }"
@@ -41,6 +48,7 @@ resource "openstack_compute_instance_v2" "control" {
   image_name            = "${ var.image_name }"
   flavor_name           = "${ var.control_flavor_name }"
   security_groups       = [ "${ var.security_groups }" ]
+  scheduler_hints = { group = "${ openstack_compute_servergroup_v2.control-sg.id }"
   network               = { uuid = "${ openstack_networking_network_v2.ms-network.id }" }
   volume = {
     volume_id = "${element(openstack_blockstorage_volume_v1.k8s-glusterfs.*.id, count.index)}"
@@ -54,6 +62,11 @@ resource "openstack_compute_instance_v2" "control" {
   count                 = "${ var.control_count }"
 }
 
+resource "openstack_compute_servergroup_v2" "resource-sg" {
+  name = "${ var.short_name}-resource-server-group"
+  policies = ["${var.server_group_resource_policy}"]
+}
+
 resource "openstack_compute_instance_v2" "resource" {
   floating_ip = "${ element(openstack_compute_floatingip_v2.ms-resource-floatip.*.address, count.index) }"
   name                  = "${ var.short_name}-worker-${format("%02d", count.index+1) }"
@@ -61,6 +74,7 @@ resource "openstack_compute_instance_v2" "resource" {
   image_name            = "${ var.image_name }"
   flavor_name           = "${ var.resource_flavor_name }"
   security_groups       = [ "${ var.security_groups }" ]
+  scheduler_hints = { group = "${ openstack_compute_servergroup_v2.resource-sg.id }" }
   network               = { uuid = "${ openstack_networking_network_v2.ms-network.id }" }
   metadata              = {
                             dc = "${var.datacenter}"
